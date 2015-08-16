@@ -49,7 +49,7 @@ cubic_func_integral, y=x^3, (low->high)
     [~////a/cn/cncr/my_cnc/demo/complete]$ 
 
 # LICENSE
-MIT
+GNU Public License.  See README
 
 # How to set up
 1) Clone this repo, (git clone https://github.com/eraether/mega_pwd.git)
