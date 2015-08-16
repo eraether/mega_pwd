@@ -14,16 +14,8 @@ class MegaPwd
 
   def main()
     prefix_string, current_path = compute_path_string()
-
-    directories = current_path.split("/")
-    final_directory = directories[-1]
-    intermediate_directories = directories[0...-1].map do |directory|
-      {:directory=>directory,:weight=>0}
-    end
-
+    intermediate_directories, final_directory = split_directories(current_path)
     available_chars = @max_output_length - prefix_string.length -  intermediate_directories.length - "#{final_directory}".length
-
-
     compute_initial_weights(intermediate_directories, @weight_function, available_chars)
     normalize_weights(intermediate_directories, available_chars)
     print_final_output(prefix_string, intermediate_directories, final_directory)
@@ -58,6 +50,16 @@ class MegaPwd
 
     return prefix_string, current_path
   end
+
+  def split_directories(current_path)
+    directories = current_path.split("/")
+    final_directory = directories[-1]
+    intermediate_directories = directories[0...-1].map do |directory|
+      {:directory=>directory,:weight=>0}
+    end
+    return intermediate_directories, final_directory
+end
+
 
     # the available characters are dispersed amongst the intermediate directories
     # based on the desired weight function defined from [0,1]
@@ -125,27 +127,27 @@ intermediate_directories.each{|hash|hash[:weight] = hash[:weight]*(available_cha
   end
 
 
-  class WeightFunctions
-    attr_reader :definite_integral, :constant_func_integral, :linear_func_integral, :sqrt_func_integral, :parabolic_func_integral, :cubic_func_integral,
-      :sin_func_integral
+class WeightFunctions
+  attr_reader :definite_integral, :constant_func_integral, :linear_func_integral, :sqrt_func_integral, :parabolic_func_integral, :cubic_func_integral,
+  :sin_func_integral
 
-    def initialize()
+  def initialize()
 
-      @definite_integral = lambda {|start_x, end_x, integral|
-        integral.call(end_x)-integral.call(start_x)
-      }
+  @definite_integral = lambda {|start_x, end_x, integral|
+    integral.call(end_x)-integral.call(start_x)
+  }
 
-      # y = 1
-      # importance is constant throughout
-      @constant_func_integral = lambda { |x| x}
+  # y = 1
+  # importance is constant throughout
+  @constant_func_integral = lambda { |x| x}
 
-      # y = x + 0.05
-      # importance starts at 0.05 and climbs up to 1.05
-      @linear_func_integral = lambda {|x| x**2/2.0 + 0.05*x}
+  # y = x + 0.05
+  # importance starts at 0.05 and climbs up to 1.05
+  @linear_func_integral = lambda {|x| x**2/2.0 + 0.05*x}
 
-      #y = x^0.5 + 0.05
-      # importance starts at 0.05 and climbs to 1.05.  However, the importance is distributed more evenly than y=x
-      @sqrt_func_integral = lambda { |x|  2*x**(1.5)/3 + 0.05*x }
+  #y = x^0.5 + 0.05
+  # importance starts at 0.05 and climbs to 1.05.  However, the importance is distributed more evenly than y=x
+  @sqrt_func_integral = lambda { |x|  2*x**(1.5)/3 + 0.05*x }
 
   # y = 4x^2-4x+1.05
   # importance starts at 1.05, drops down to 0.05 in the middle and goes back up to 1.05 at the end.
