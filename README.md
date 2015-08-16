@@ -9,9 +9,7 @@ The current working path is split into folders.  Each of these folders is then a
 which means that the closer the folder is to the current working directory (and the higher the x), the more weight it has.  There are currently 5 different algorithms defined for computing the weight, which can be readily swapped out.
 
 # Demo
-The following demo shows how the script performs when navigating down 11 directories.  It is using the default sqrt_func_integral function to compute weight.
-
-sqrt_func_integral, y=x^0.5, (low->high)
+The following demo shows how the script performs when navigating down 11 directories.  Any files under $HOME are prefixed with a tilde(~).
 
     [/]$ cd home
     [/home]$ cd eugene
