@@ -21,7 +21,7 @@ elsif current_directory_string.start_with?(home_directory_string) then
   current_path=current_directory.relative_path_from(home_directory).to_s
 #otherwise, print the whole path
 else
-    current_path=current_directory.to_s
+  current_path=current_directory.to_s
 end
 
 directories = current_path.split("/")
@@ -45,13 +45,44 @@ available_chars = max_output_length - prefix_string.length -  intermediate_direc
 
 # all of the following functions are integrals of the functions they define
 
+
+definite_integral = lambda {|start_x, end_x, integral|
+  integral.call(end_x)-integral.call(start_x)
+}
+
+
+
 # y = 1
-constant_function = lambda { |start_x,end_x| end_x-start_x}
+# importance is constant throughout
+constant_func_integral = lambda { |x| x}
 
-# y = x
-linear_function = lambda {|start_x,end_x| end_x**2-start_x**2}
+# y = x + 0.05
+# importance starts at 0.05 and climbs up to 1.05
+linear_func_integral = lambda {|x| x**2/2.0 + 0.05*x}
 
-distribution_function = linear_function
+#y = x^0.5 + 0.05
+# importance starts at 0.05 and climbs to 1.05.  However, the importance is distributed more evenly than y=x
+  sqrt_func_integral = lambda { |x|
+    2*x**(1.5)/3 + 0.05*x
+  }
+
+# y = 4x^2-4x+1.05
+# importance starts at 1.05, drops down to 0.05 in the middle and goes back up to 1.05 at the end.
+parabolic_func_integral = lambda { |x|
+  4*x**3/3 - 2*x**2 +1.05*x
+}
+
+# y = sin(2.5*πx)^2 + 0.05
+# importance cycles between 0.05 and 1.05 5 times, ending with 1.05 importance
+sin_func_integral = lambda {|x|
+  π = Math::PI
+ 0.55*x - Math.sin(5*π*x)/(π*10)
+}
+
+
+distribution_function = lambda {|start_x, end_x|
+  definite_integral.call(start_x,end_x,sin_func_integral)
+}
 
 
 intermediate_directories.each_with_index do |hash, x|
@@ -61,47 +92,45 @@ intermediate_directories.each_with_index do |hash, x|
   hash[:weight] = result
 end
 
-#puts "Weights:#{intermediate_directories.map{|x|x[:weight]}}"
 
-unrounded_characters_used = intermediate_directories.inject(0){|sum,x|sum+x[:weight].to_i}
+# normalize resulting weights on to the available characters
+total_characters_used = intermediate_directories.inject(0.0){|sum, hash|sum+hash[:weight]}
+
+# avoid divide by 0 errors
+if total_characters_used == 0
+  total_characters_used = 1
+end
+
+intermediate_directories.each{|hash|hash[:weight] = hash[:weight]*(available_chars/total_characters_used.to_f)}
+total_characters_used = intermediate_directories.inject(0.0){|sum, hash|sum+hash[:weight]}
+unrounded_characters_used = intermediate_directories.inject(0.0){|sum,x|sum+x[:weight].floor}
+
 remaining_rounding_characters = available_chars-unrounded_characters_used
 intermediate_directories.sort_by{|hash|
   hash[:weight]-hash[:weight].floor
-}.reverse().each{|hash|
-  weight = hash[:weight]
-if remaining_rounding_characters > 0 then
-  remaining_rounding_characters -= 1
-  weight = weight.ceil
-else
-  weight = weight.floor
-end
-hash[:weight] = weight
-}
+  }.reverse().each{|hash|
+    weight = hash[:weight]
+    if remaining_rounding_characters > 0 then
+      remaining_rounding_characters -= 1
+      weight = weight.ceil
+    else
+      weight = weight.floor
+    end
+    hash[:weight] = weight
+  }
 
-# puts "Remaining rounding characters:#{remaining_rounding_characters}"
-# intermediate_directories = intermediate_directories.reverse().each {|hash|
-#   weight = hash[:weight]
-#   if weight.floor != weight && remaining_rounding_characters > 0 then
-#     remaining_rounding_characters -= 1
-#     weight = weight.ceil
-#   else
-#     weight = weight.floor
-#   end
-#   hash[:weight]=weight
-#   }.reverse()
-
-#puts "Weights:#{intermediate_directories.map{|x|x[:weight]}}"
+  #intermediate_directories.each{|hash|puts hash}
 
 STDOUT.print  prefix_string+intermediate_directories.map{|hash|
   directory = hash[:directory];
   weight = hash[:weight];
-if directory.length < weight
-  next directory;
-end
-abbreviated = directory[0]+directory[1..-1].gsub(/[aeiou]/i, '')
-if abbreviated.length < weight
-  abbreviated = directory;
-end
-"#{abbreviated[0...weight]}"
+  if directory.length < weight
+    next directory;
+  end
+  abbreviated = directory[0]+directory[1..-1].gsub(/[aeiou]/i, '')
+  if abbreviated.length < weight
+    abbreviated = directory;
+  end
+  "#{abbreviated[0...weight]}"
   }.push(final_directory).compact().join("/")
-STDOUT.flush
+  STDOUT.flush
