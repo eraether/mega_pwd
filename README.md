@@ -4,7 +4,7 @@ Dynamically shorten directory names.  Intended for use as part of your $PS1.
 # How to set up
 1) Clone this repo, (git clone https://github.com/eraether/mega_pwd.git)
 
-2) Add the following to your .profile
+2) Add the following to your ~/.profile file:
 
 CURRENT_DIRECTORY=$(ruby ~/path/to/mega_pwd/pretty_pwd.rb)
 
