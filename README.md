@@ -17,7 +17,8 @@ The following demo shows how the script performs when navigating down 11 directo
     [~/development]$ cd scheduler
     [~/development/scheduler]$ cd autoscheduler
     [~/developm/scheduler/autoscheduler]$ cd app
-    [~/dvlpmnt/scheduler/autoscheduler/app]$ cd controllers[eugene@eugene-VirtualBox ~/dvl/schdl/atschdl/app/controllers]$ cd concerns
+    [~/dvlpmnt/scheduler/autoscheduler/app]$ cd controllers
+    [~/dvl/schdl/atschdl/app/controllers]$ cd concerns
     [~/dvl/schd/atsch/app/cntrllr/concerns]$ cd my_concern
     [~/dv/sch/ats/app/cntrl/cncrn/my_concern]$ cd demo
     [~/dv/sch/ats/app/cntrl/cncrn/my_cn/demo]$ cd complete
