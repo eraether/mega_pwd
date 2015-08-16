@@ -4,13 +4,17 @@ current_directory=Pathname.new(Dir.pwd)
 
 home_directory_string = home_directory.cleanpath.to_s
 current_directory_string = current_directory.cleanpath.to_s
-#if the current path is the home directory, display a "~"
 
 current_path = ""
 prefix_string = ""
 
+#if the current path is the home directory, display a "~"
 if  current_directory_string == home_directory_string
   prefix_string = "~"
+
+#if we're at the root directory, print something.
+elsif current_directory_string == "/"
+  prefix_string = "/"
 #if the current path is relative to the home directory, prefix the string with a "~/"
 elsif current_directory_string.start_with?(home_directory_string) then
   prefix_string = "~/"
@@ -21,17 +25,16 @@ else
 end
 
 directories = current_path.split("/")
-final_directory = "#{directories[-1]}"
+final_directory = directories[-1]
 intermediate_directories = directories[0...-1].map do |directory|
   {:directory=>directory,:weight=>0}
 end
 
-
 # display the first 3 characters of every directory except the last one
 # and print the last directory in its entirety
 max_output_length = 40; #characters
-available_chars = max_output_length - prefix_string.length -  intermediate_directories.length - final_directory.length
-puts "Available characters:#{available_chars}"
+available_chars = max_output_length - prefix_string.length -  intermediate_directories.length - "#{final_directory}".length
+
 # the remaining available characters are dispersed amongst the intermediate directories
 # based on the desired function defined from [0,1]
 # the amount of assigned characters is equal to the integral of the defined directory's range as a percentage of the whole
@@ -58,29 +61,40 @@ intermediate_directories.each_with_index do |hash, x|
   hash[:weight] = result
 end
 
-puts "Weights:#{intermediate_directories.map{|x|x[:weight]}}"
+#puts "Weights:#{intermediate_directories.map{|x|x[:weight]}}"
 
 unrounded_characters_used = intermediate_directories.inject(0){|sum,x|sum+x[:weight].to_i}
 remaining_rounding_characters = available_chars-unrounded_characters_used
-
-puts "Remaining rounding characters:#{remaining_rounding_characters}"
-intermediate_directories = intermediate_directories.reverse().each {|hash|
+intermediate_directories.sort_by{|hash|
+  hash[:weight]-hash[:weight].floor
+}.reverse().each{|hash|
   weight = hash[:weight]
-  if weight.floor != weight && remaining_rounding_characters > 0 then
-    remaining_rounding_characters -= 1
-    weight = weight.ceil
-  else
-    weight = weight.floor
-  end
-  hash[:weight]=weight
-  }.reverse()
+if remaining_rounding_characters > 0 then
+  remaining_rounding_characters -= 1
+  weight = weight.ceil
+else
+  weight = weight.floor
+end
+hash[:weight] = weight
+}
 
-puts "Weights:#{intermediate_directories.map{|x|x[:weight]}}"
+# puts "Remaining rounding characters:#{remaining_rounding_characters}"
+# intermediate_directories = intermediate_directories.reverse().each {|hash|
+#   weight = hash[:weight]
+#   if weight.floor != weight && remaining_rounding_characters > 0 then
+#     remaining_rounding_characters -= 1
+#     weight = weight.ceil
+#   else
+#     weight = weight.floor
+#   end
+#   hash[:weight]=weight
+#   }.reverse()
+
+#puts "Weights:#{intermediate_directories.map{|x|x[:weight]}}"
 
 STDOUT.print  prefix_string+intermediate_directories.map{|hash|
   directory = hash[:directory];
   weight = hash[:weight];
-  puts "Directory:#{directory}, Weight:#{weight}"
 if directory.length < weight
   next directory;
 end
@@ -89,5 +103,5 @@ if abbreviated.length < weight
   abbreviated = directory;
 end
 "#{abbreviated[0...weight]}"
-  }.join("/")+"/#{final_directory}"
+  }.push(final_directory).compact().join("/")
 STDOUT.flush
