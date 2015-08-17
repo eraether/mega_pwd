@@ -57,6 +57,11 @@ class MegaPwd
     intermediate_directories = directories[0...-1].map do |directory|
       {:directory=>directory,:weight=>0}
     end
+
+    if not final_directory.to_s.empty?
+      final_directory = "[#{final_directory}]"
+    end
+    
     return intermediate_directories, final_directory
 end
 
