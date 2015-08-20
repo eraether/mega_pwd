@@ -1,0 +1,24 @@
+#this file serves to get you up and running with mega_pwd
+#add the following command to ~/.profile:
+# source path/to/this/directory/example_prompt
+
+function mega_pwd_example_prompt {
+  Color_Off='\[\e[0m\]'       # Text Reset
+  BGreen='\[\e[1;32m\]'       # Green
+  Blue='\[\e[0;34m\]'        # Blue
+  BBlue='\[\e[1;34m\]'        # Blue
+  BWhite='\[\e[1;37m\]'       # White
+
+  EXITSTATUS="$?"
+  CURRENT_DIRECTORY=$(ruby mega_pwd.rb)
+  PROMPT="${Color_Off}${BGreen}\u@\h ${Blue}${CURRENT_DIRECTORY}"
+  if [ "${EXITSTATUS}" -eq 0 ]
+  then
+    ISSUE=""
+  else
+    ISSUE=" ${BRed}(${EXITSTATUS})"
+  fi
+  PS1="${Color_Off}${BWhite}[${PROMPT}${ISSUE}${Color_Off}${BWhite}]\$ ${Color_Off}"
+}
+
+PROMPT_COMMAND=mega_pwd_example_prompt

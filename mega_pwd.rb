@@ -5,24 +5,40 @@ class Runner
     weight_functions = WeightFunctions.new
 
     max_output_length = 30
-    color_output = true
+    color_output = :full #:partial, :off
      weight_function = lambda do |start_x, end_x|
       weight_functions.definite_integral.call(start_x,end_x,weight_functions.sqrt_func_integral)
     end
 
-    if color_output
-      current_dir_start_string = "\\[\\e[1;33m\\]"
-      current_dir_end_string   = "\\[\\e[0m\\]"
-      cap_str_length = 0
-  else
-      current_dir_start_string = "["
-      current_dir_end_string  = "]"
-      cap_str_length = current_dir_start_string.length + current_dir_end_string.length
-  end
+    decoration = {:first_dir_prefix=>"",:last_dir_prefix=>"",:last_dir_suffix=>"",:cap_printable_chars=>0, :dir_separator=>"/", :dir_separator_chars=>1}
+
+    case color_output
+    when :full # 256 colors
+      decoration[:first_dir_prefix] = "\\[\\e[1;34m\\]"
+      decoration[:last_dir_prefix] =  "\\[\\e[38;5;123m\\]"
+      decoration[:last_dir_suffix] = "\\[\\e[0m\\]"
+      decoration[:dir_separator] = "/"
+      decoration[:dir_separator_chars] = 1
+      decoration[:printable_chars] = 0
+    when :partial # 8 colors
+      decoration[:first_dir_prefix] = "\\[\\e[0;34m\\]"
+      decoration[:last_dir_prefix] = "\\[\\e[1;34m\\]"
+      decoration[:last_dir_suffix] = "\\[\\e[0m\\]"
+      decoration[:dir_separator] = "/"
+      decoration[:dir_separator_chars] = 1
+      decoration[:printable_chars] = 0
+    when :off # no colors
+      decoration[:first_dir_prefix] = ""
+      decoration[:last_dir_prefix] = "["
+      decoration[:last_dir_suffix] = "]"
+      decoration[:dir_separator] = "/"
+      decoration[:dir_separator_chars] = 1
+      decoration[:printable_chars] = 2
+    end
 
 
 
-    mega_pwd = MegaPwd.new(max_output_length, weight_function, current_dir_start_string, current_dir_end_string, cap_str_length)
+    mega_pwd = MegaPwd.new(max_output_length, weight_function, decoration)
     mega_pwd.main();
   end
 end
@@ -69,25 +85,35 @@ end
 
 
 class MegaPwd
-  def initialize(max_output_length, weight_function, start_str, end_str, cap_str_length)
+  def initialize(max_output_length, weight_function, decoration)
     @max_output_length = max_output_length
     @weight_function = weight_function
-    @start_str = start_str
-    @end_str = end_str
-    @cap_str_length = cap_str_length
+    @decoration = decoration
   end
 
   def main()
     prefix_string, current_path = compute_path_string()
-    intermediate_directories, final_directory, bolded_final_dir = split_directories(current_path, @start_str, @end_str)
-    available_chars = @max_output_length - prefix_string.length -  intermediate_directories.length - final_directory.to_s.length - @cap_str_length
+    intermediate_directories, final_directory = split_directories(current_path)
+    available_chars = compute_available_chars(@max_output_length, prefix_string, intermediate_directories, final_directory, @decoration)
     compute_initial_weights(intermediate_directories, @weight_function, available_chars)
     normalize_weights(intermediate_directories, available_chars)
-    print_final_output(prefix_string, intermediate_directories, bolded_final_dir)
+    print_final_output(prefix_string, intermediate_directories, final_directory, @decoration)
   end
 
-  def printable_character_count(str)
-    str.gsub(/[^[:print:]]/,'').length
+  def compute_available_chars(max_output_length, prefix_string, intermediate_directories, final_directory, decoration)
+    arr = []
+    available_chars = max_output_length
+    arr.push(available_chars)
+    available_chars -= prefix_string.length # count '~/'
+    arr.push(available_chars)
+    available_chars -= intermediate_directories.length*decoration[:dir_separator_chars] # more dirs, more '/'s to print out
+    arr.push(available_chars)
+    available_chars -= final_directory.to_s.length # current directory always printed in full
+    arr.push(available_chars)
+    available_chars -= decoration[:printable_chars] # count decoration around the current directory
+    arr.push(available_chars)
+    available_chars = [0, available_chars].max
+    return available_chars
   end
 
   def compute_path_string()
@@ -110,7 +136,7 @@ class MegaPwd
       prefix_string = "/"
       #if the current path is relative to the home directory, prefix the string with a "~/"
     elsif current_directory_string.start_with?(home_directory_string) then
-      prefix_string = "~/"
+      prefix_string = "~"
       current_path=current_directory.relative_path_from(home_directory).to_s
       #otherwise, print the whole path
     else
@@ -120,18 +146,13 @@ class MegaPwd
     return prefix_string, current_path
   end
 
-  def split_directories(current_path, start_str, end_str)
+  def split_directories(current_path)
     directories = current_path.split("/")
     final_directory = directories[-1]
     intermediate_directories = directories[0...-1].map do |directory|
       {:directory=>directory,:weight=>0}
     end
-    bolded_final_dir = final_directory
-    if not final_directory.to_s.empty?
-      bolded_final_dir = "#{start_str}#{final_directory}#{end_str}"
-    end
-
-    return intermediate_directories, final_directory, bolded_final_dir
+    return intermediate_directories, final_directory
 end
 
 
@@ -213,9 +234,24 @@ def normalize_weights(intermediate_directories, available_chars)
   clamp_weights(intermediate_directories, available_chars)
 end
 
+  def decorate_prefix_directory(prefix_directory, decoration)
+    if not prefix_directory.to_s.empty?
+      return "#{decoration[:first_dir_prefix]}#{prefix_directory}"
+    else
+      return prefix_directory
+    end
+  end
 
-    def print_final_output(prefix_string, intermediate_directories, final_directory)
-      STDOUT.print  prefix_string+intermediate_directories.map{|hash|
+  def decorate_final_directory(final_directory, decoration)
+    if not final_directory.to_s.empty?
+      return "#{decoration[:last_dir_prefix]}#{final_directory}#{decoration[:last_dir_suffix]}"
+    else
+      return final_directory
+    end
+  end
+
+  def generate_weighted_directory_output(intermediate_directories)
+    intermediate_directories.map{|hash|
         directory = hash[:directory];
         weight = hash[:weight];
         if directory.length < weight
@@ -226,7 +262,16 @@ end
           abbreviated = directory;
         end
         "#{abbreviated[0...weight]}"
-      }.push(final_directory).compact().join("/")
+      }
+    end
+
+
+    def print_final_output(prefix_string, intermediate_directories, final_directory, decoration)
+      weighted_directories= generate_weighted_directory_output(intermediate_directories)
+      decorated_prefix_dir = decorate_prefix_directory(prefix_string, decoration)
+      decorated_final_dir = decorate_final_directory(final_directory, decoration)
+      directory_output = [decorated_prefix_dir, *weighted_directories, decorated_final_dir].compact().join(decoration[:dir_separator])
+      STDOUT.print directory_output
       STDOUT.flush
     end
   end
