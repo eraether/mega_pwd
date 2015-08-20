@@ -15,11 +15,11 @@ class Runner
     case color_output
     when :full # 256 colors
       decoration[:first_dir_prefix] = "\\[\\e[1;34m\\]"
-      decoration[:last_dir_prefix] =  "\\[\\e[38;5;123m\\]"
-      decoration[:last_dir_suffix] = "\\[\\e[0m\\]"
-      decoration[:dir_separator] = "/"
+      decoration[:last_dir_prefix] =  "\\[\\e[38;5;195m\\]["
+      decoration[:last_dir_suffix] = "]\\[\\e[0m\\]"
+      decoration[:dir_separator] = "\\[\\e[38;5;75m\\]/\\[\\e[38;5;111m\\]"
       decoration[:dir_separator_chars] = 1
-      decoration[:printable_chars] = 0
+      decoration[:printable_chars] = 2
     when :partial # 8 colors
       decoration[:first_dir_prefix] = "\\[\\e[0;34m\\]"
       decoration[:last_dir_prefix] = "\\[\\e[1;34m\\]"
