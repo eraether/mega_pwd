@@ -7,7 +7,7 @@ class Runner
     max_output_length = 30
     color_output = :full #:full, :partial, :off
      weight_function = lambda do |start_x, end_x|
-      weight_functions.definite_integral.call(start_x,end_x,weight_functions.sqrt_func_integral)
+      weight_functions.definite_integral.call(start_x,end_x,weight_functions.parabolic_func_integral)
     end
 
     decoration = {
@@ -15,15 +15,18 @@ class Runner
       :last_dir_prefix=>"",
       :last_dir_suffix=>"",
       :printable_chars=>0, # sum of visible first_dir_prefix, last_dir_prefix, and last_dir_suffix strings
+      :skip_dir_separator=>["/"],
       :dir_separator=>"/",
       :dir_separator_chars=>1}
 
     case color_output
     when :full # 256 colors
+      intermediate_dir_color = "\\[\\e[38;5;111m\\]"
       decoration[:first_dir_prefix] = "\\[\\e[1;34m\\]"
       decoration[:last_dir_prefix] =  "\\[\\e[38;5;195m\\]"
       decoration[:last_dir_suffix] = "\\[\\e[0m\\]"
-      decoration[:dir_separator] = "\\[\\e[38;5;75m\\]⥋ \\[\\e[38;5;111m\\]"
+      decoration[:dir_separator] = "\\[\\e[38;5;75m\\]⥋ #{intermediate_dir_color}"
+      decoration[:skip_dir_separator] =  [46, 76,106,136,166,196].map.with_index{|color, index| Array.new((index+1)**1.5, "\\[\\e[38;5;#{color}m\\]⥋ #{intermediate_dir_color}")}.flatten
       decoration[:dir_separator_chars] = 2
       decoration[:printable_chars] = 2
     when :partial # 8 colors
@@ -77,7 +80,7 @@ class WeightFunctions
   @parabolic_func_integral = lambda { |x|4*x**3/3 - 2*x**2 +1.05*x}
 
       # y = x^3
-      # importance starts at 0, then goes to 1 towards the end
+      # importance hovers at 0 until it shoots to 1.  Almost nothing has importance except the last view items
       @cubic_func_integral = lambda {|x|x**4}
 
       # y = sin(2.5*px)^2 + 0.05
@@ -100,9 +103,9 @@ class MegaPwd
   def main()
     prefix_string, current_path = compute_path_string()
     intermediate_directories, final_directory = split_directories(current_path)
-    available_chars, dirs_over_capacity = compute_available_chars(@max_output_length, prefix_string, intermediate_directories, final_directory, @decoration)
+    available_chars = compute_available_chars(@max_output_length, prefix_string, intermediate_directories, final_directory, @decoration)
     compute_initial_weights(intermediate_directories, @weight_function, available_chars)
-    intermediate_directories = normalize_weights(intermediate_directories, available_chars, dirs_over_capacity)
+    intermediate_directories = normalize_weights(intermediate_directories, available_chars, @decoration[:dir_separator_chars])
     print_final_output(prefix_string, intermediate_directories, final_directory, @decoration)
   end
 
@@ -112,19 +115,12 @@ class MegaPwd
     arr.push(available_chars)
     available_chars -= prefix_string.length # count '~/'
     arr.push(available_chars)
-    available_chars -= intermediate_directories.length*decoration[:dir_separator_chars] # more dirs, more '/'s to print out
-    arr.push(available_chars)
     available_chars -= final_directory.to_s.length # current directory always printed in full
     arr.push(available_chars)
     available_chars -= decoration[:printable_chars] # count decoration around the current directory
     arr.push(available_chars)
-    dirs_over_capacity = 0
-    if available_chars < 0
-      gain = decoration[:dir_separator_chars]
-      dirs_over_capacity = (available_chars / -gain.to_f).ceil
-    end
     available_chars = [0, available_chars].max
-    return available_chars, dirs_over_capacity
+    return available_chars
   end
 
   def compute_path_string()
@@ -162,7 +158,7 @@ class MegaPwd
     final_directory = directories[-1]
     final_directory ||= ""
     intermediate_directories = directories[0...-1].map do |directory|
-      {:directory=>directory,:weight=>0}
+      {:directory=>directory,:weight=>0, :enabled=>true}
     end
     return intermediate_directories, final_directory
 end
@@ -199,23 +195,40 @@ def scale_weight_sum(intermediate_directories,available_chars)
   intermediate_directories.each{|hash|hash[:weight] = hash[:weight]*(available_chars/total_characters_used.to_f)}
 end
 
+def redistribute_weight_from_item(item, extra_weight, unprocessed_directories)
+  current_unprocessed_weight = unprocessed_directories.inject(0.0){|sum,hash|sum+hash[:weight]}
+  new_unprocessed_weight = current_unprocessed_weight+extra_weight;
+  multiplier = new_unprocessed_weight/current_unprocessed_weight;
+  item[:weight] -= extra_weight
+  unprocessed_directories.delete(item)
+  unprocessed_directories.each{|hash|hash[:weight]=hash[:weight]*multiplier}
+end
+
 # redistributes any weight longer than the directory name to remaining directories
-def redistribute_unused_weight(intermediate_directories)
+def redistribute_unused_weight(intermediate_directories, dir_separator_chars)
   unprocessed_directories = Array.new(intermediate_directories)
   while not unprocessed_directories.empty?
     unprocessed_directories = unprocessed_directories.sort_by {|hash|hash[:weight]-hash[:directory].length.to_f}.reverse()
-    first = unprocessed_directories.shift()
-    extra = first[:weight]-first[:directory].length
+    first = unprocessed_directories[0]
+    first_target_weight = first[:directory].length+dir_separator_chars
+    last = unprocessed_directories[-1]
 
-    current_unprocessed_weight = unprocessed_directories.inject(0.0){|sum,hash|sum+hash[:weight]}
-    new_unprocessed_weight = current_unprocessed_weight+extra;
-    multiplier = new_unprocessed_weight/current_unprocessed_weight;
 
-    if multiplier > 1
-      first[:weight] = first[:directory].length
-      unprocessed_directories.each{|hash|hash[:weight]=hash[:weight]*multiplier}
+    # extra weight can be redistributed
+    if first[:weight] > first_target_weight
+      redistribute_weight_from_item(first, first[:weight]-first_target_weight, unprocessed_directories)
+    # cannibalize dirs that don't have enough weight to be printed
+    elsif last[:weight] < dir_separator_chars
+      extra = last[:weight]
+      redistribute_weight_from_item(last, last[:weight], unprocessed_directories)
     else
       break
+    end
+  end
+
+  intermediate_directories.each do |hash|
+    if hash[:weight] < dir_separator_chars
+      hash[:enabled] = false
     end
   end
 end
@@ -230,7 +243,7 @@ def clamp_weights(intermediate_directories, available_chars)
         hash[:weight]-hash[:weight].floor
       }.reverse().each{|hash|
         weight = hash[:weight]
-        if remaining_rounding_characters > 0 then
+        if remaining_rounding_characters > 0 and hash[:enabled] then
           remaining_rounding_characters -= 1
           weight = weight.ceil
         else
@@ -240,57 +253,74 @@ def clamp_weights(intermediate_directories, available_chars)
       }
 end
 
-def clamp_total_dirs(intermediate_directories, dirs_over_capacity)
-  new_dirs = intermediate_directories.map.with_index.sort_by{|hash, index|hash[:weight]}.drop(dirs_over_capacity).sort_by(&:last).map(&:first)
-  return new_dirs
-end
+# def clamp_total_dirs(intermediate_directories, dirs_over_capacity)
+#   new_dirs = intermediate_directories.map.with_index.sort_by{|hash, index|hash[:weight]}.drop(dirs_over_capacity).sort_by(&:last).map(&:first)
+#   return new_dirs
+# end
 
-def normalize_weights(intermediate_directories, available_chars, dirs_over_capacity)
+def normalize_weights(intermediate_directories, available_chars, dir_separator_chars)
   scale_weight_sum(intermediate_directories,available_chars)
-  intermediate_directories = clamp_total_dirs(intermediate_directories, dirs_over_capacity)
-  redistribute_unused_weight(intermediate_directories)
+  redistribute_unused_weight(intermediate_directories, dir_separator_chars)
   clamp_weights(intermediate_directories, available_chars)
+  intermediate_directories.each do |item| item[:weight] -= dir_separator_chars end
   return intermediate_directories
 end
 
   def decorate_prefix_directory(prefix_directory, decoration)
     if not prefix_directory.to_s.empty?
-      return "#{decoration[:first_dir_prefix]}#{prefix_directory}"
-    else
-      return prefix_directory
+      prefix_directory = "#{decoration[:first_dir_prefix]}#{prefix_directory}"
     end
+    return {:directory=>prefix_directory,:weight=>prefix_directory.length, :enabled=>true}
   end
 
   def decorate_final_directory(final_directory, decoration)
     if not final_directory.to_s.empty?
-      return "#{decoration[:last_dir_prefix]}#{final_directory}#{decoration[:last_dir_suffix]}"
-    else
-      return final_directory
+      final_directory = "#{decoration[:last_dir_prefix]}#{final_directory}#{decoration[:last_dir_suffix]}"
     end
+    return {:directory=>final_directory,:weight=>final_directory.length, :enabled=>true}
   end
 
-  def generate_weighted_directory_output(intermediate_directories)
-    intermediate_directories.map{|hash|
-        directory = hash[:directory];
-        weight = hash[:weight];
+
+  def generate_weighted_directory_output(intermediate_directory)
+        directory = intermediate_directory[:directory];
+        weight = intermediate_directory[:weight];
         if directory.length <= weight
-          next directory;
+          return directory;
         end
         abbreviated = directory[0]+directory[1..-1].gsub(/[aeiou]/i, '')
         if abbreviated.length < weight
           abbreviated = directory;
         end
         "#{abbreviated[0...weight]}"
-      }
     end
 
 
     def print_final_output(prefix_string, intermediate_directories, final_directory, decoration)
-      weighted_directories= generate_weighted_directory_output(intermediate_directories)
       decorated_prefix_dir = decorate_prefix_directory(prefix_string, decoration)
       decorated_final_dir = decorate_final_directory(final_directory, decoration)
-      final_output_segments = [decorated_prefix_dir, *weighted_directories, decorated_final_dir]
-      directory_output = final_output_segments.join(decoration[:dir_separator]).strip
+      final_output_segments = [decorated_prefix_dir, *intermediate_directories, decorated_final_dir]
+
+      final_output = ""
+      dir_separators = [decoration[:dir_separator], *decoration[:skip_dir_separator]]
+      disabled_segments = 0
+      final_output_segments.each_with_index do |item, index|
+        if not item[:enabled]
+          disabled_segments+=1
+          next
+        end
+
+        prefix = ""
+        if index != 0
+          prefix = dir_separators[disabled_segments]
+          prefix ||= dir_separators.last
+        end
+        weighted_output = generate_weighted_directory_output(item)
+
+        final_output += "#{prefix}#{weighted_output}"
+        disabled_segments= 0
+      end
+
+      directory_output = final_output.strip
       STDOUT.print directory_output
       STDOUT.flush
     end
