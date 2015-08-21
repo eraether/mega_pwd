@@ -9,22 +9,8 @@ The current working path is split into folders.  Each of these folders is then a
 which means that the closer the folder is to the current working directory (and the higher the x), the more weight it has.  There are currently 5 different algorithms defined for computing the weight, which can be readily swapped out.
 
 # Demo
-The following demo shows how the script performs when navigating down 11 directories.  Any files under $HOME are prefixed with a tilde(~).
-
-    [/]$ cd home
-    [/home]$ cd eugene
-    [~]$ cd development
-    [~/development]$ cd scheduler
-    [~/development/scheduler]$ cd autoscheduler
-    [~/developm/scheduler/autoscheduler]$ cd app
-    [~/dvlpmnt/scheduler/autoscheduler/app]$ cd controllers
-    [~/dvl/schdl/atschdl/app/controllers]$ cd concerns
-    [~/dvl/schd/atsch/app/cntrllr/concerns]$ cd my_concern
-    [~/dv/sch/ats/app/cntrl/cncrn/my_concern]$ cd demo
-    [~/dv/sch/ats/app/cntrl/cncrn/my_cn/demo]$ cd complete
-    [~/d/sc/at/app/cnt/cnc/my_c/demo/complete]$ pwd
-    /home/eugene/development/scheduler/autoscheduler/app/controllers/concerns/my_concern/demo/complete
-    [~/d/sc/at/app/cnt/cnc/my_c/demo/complete]$ 
+The following demo shows how the script performs when navigating down 15 directories.  Any files under $HOME are prefixed with a tilde(~).  The entire time, the pwd string is below the specified cap of 30 characters.
+![Demo Image](http://i.imgur.com/C6XOs8R.png)
 
 The other functions are shown below for the same folder:
 
@@ -49,7 +35,7 @@ cubic_func_integral, y=x^3, (low->high)
     [~////a/cn/cncr/my_cnc/demo/complete]$ 
 
 # LICENSE
-GNU Public License.  See README
+GNU Public License.  See LICENSE.
 
 # How to set up
 1) Clone this repo, (git clone https://github.com/eraether/mega_pwd.git)
