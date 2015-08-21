@@ -10,7 +10,13 @@ class Runner
       weight_functions.definite_integral.call(start_x,end_x,weight_functions.sqrt_func_integral)
     end
 
-    decoration = {:first_dir_prefix=>"",:last_dir_prefix=>"",:last_dir_suffix=>"",:cap_printable_chars=>0, :dir_separator=>"/", :dir_separator_chars=>1}
+    decoration = {
+      :first_dir_prefix=>"",
+      :last_dir_prefix=>"",
+      :last_dir_suffix=>"",
+      :printable_chars=>0, # sum of visible first_dir_prefix, last_dir_prefix, and last_dir_suffix strings
+      :dir_separator=>"/",
+      :dir_separator_chars=>1}
 
     case color_output
     when :full # 256 colors
@@ -94,9 +100,9 @@ class MegaPwd
   def main()
     prefix_string, current_path = compute_path_string()
     intermediate_directories, final_directory = split_directories(current_path)
-    available_chars = compute_available_chars(@max_output_length, prefix_string, intermediate_directories, final_directory, @decoration)
+    available_chars, dirs_over_capacity = compute_available_chars(@max_output_length, prefix_string, intermediate_directories, final_directory, @decoration)
     compute_initial_weights(intermediate_directories, @weight_function, available_chars)
-    normalize_weights(intermediate_directories, available_chars)
+    intermediate_directories = normalize_weights(intermediate_directories, available_chars, dirs_over_capacity)
     print_final_output(prefix_string, intermediate_directories, final_directory, @decoration)
   end
 
@@ -112,8 +118,13 @@ class MegaPwd
     arr.push(available_chars)
     available_chars -= decoration[:printable_chars] # count decoration around the current directory
     arr.push(available_chars)
+    dirs_over_capacity = 0
+    if available_chars < 0
+      gain = decoration[:dir_separator_chars]
+      dirs_over_capacity = (available_chars / -gain.to_f).ceil
+    end
     available_chars = [0, available_chars].max
-    return available_chars
+    return available_chars, dirs_over_capacity
   end
 
   def compute_path_string()
@@ -229,10 +240,17 @@ def clamp_weights(intermediate_directories, available_chars)
       }
 end
 
-def normalize_weights(intermediate_directories, available_chars)
+def clamp_total_dirs(intermediate_directories, dirs_over_capacity)
+  new_dirs = intermediate_directories.map.with_index.sort_by{|hash, index|hash[:weight]}.drop(dirs_over_capacity).sort_by(&:last).map(&:first)
+  return new_dirs
+end
+
+def normalize_weights(intermediate_directories, available_chars, dirs_over_capacity)
   scale_weight_sum(intermediate_directories,available_chars)
+  intermediate_directories = clamp_total_dirs(intermediate_directories, dirs_over_capacity)
   redistribute_unused_weight(intermediate_directories)
   clamp_weights(intermediate_directories, available_chars)
+  return intermediate_directories
 end
 
   def decorate_prefix_directory(prefix_directory, decoration)
