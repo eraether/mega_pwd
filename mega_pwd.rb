@@ -5,7 +5,7 @@ class Runner
     weight_functions = WeightFunctions.new
 
     max_output_length = 30
-    color_output = :full #:partial, :off
+    color_output = :full #:full, :partial, :off
      weight_function = lambda do |start_x, end_x|
       weight_functions.definite_integral.call(start_x,end_x,weight_functions.sqrt_func_integral)
     end
@@ -15,10 +15,10 @@ class Runner
     case color_output
     when :full # 256 colors
       decoration[:first_dir_prefix] = "\\[\\e[1;34m\\]"
-      decoration[:last_dir_prefix] =  "\\[\\e[38;5;195m\\]["
-      decoration[:last_dir_suffix] = "]\\[\\e[0m\\]"
-      decoration[:dir_separator] = "\\[\\e[38;5;75m\\]/\\[\\e[38;5;111m\\]"
-      decoration[:dir_separator_chars] = 1
+      decoration[:last_dir_prefix] =  "\\[\\e[38;5;195m\\]"
+      decoration[:last_dir_suffix] = "\\[\\e[0m\\]"
+      decoration[:dir_separator] = "\\[\\e[38;5;75m\\]⥋ \\[\\e[38;5;111m\\]"
+      decoration[:dir_separator_chars] = 2
       decoration[:printable_chars] = 2
     when :partial # 8 colors
       decoration[:first_dir_prefix] = "\\[\\e[0;34m\\]"
@@ -133,7 +133,7 @@ class MegaPwd
 
       #if we're at the root directory, print something.
     elsif current_directory_string == "/"
-      prefix_string = "/"
+      prefix_string = ""
       #if the current path is relative to the home directory, prefix the string with a "~/"
     elsif current_directory_string.start_with?(home_directory_string) then
       prefix_string = "~"
@@ -147,8 +147,9 @@ class MegaPwd
   end
 
   def split_directories(current_path)
-    directories = current_path.split("/")
+    directories = current_path.strip.split("/")-[""]
     final_directory = directories[-1]
+    final_directory ||= ""
     intermediate_directories = directories[0...-1].map do |directory|
       {:directory=>directory,:weight=>0}
     end
@@ -254,7 +255,7 @@ end
     intermediate_directories.map{|hash|
         directory = hash[:directory];
         weight = hash[:weight];
-        if directory.length < weight
+        if directory.length <= weight
           next directory;
         end
         abbreviated = directory[0]+directory[1..-1].gsub(/[aeiou]/i, '')
@@ -270,7 +271,8 @@ end
       weighted_directories= generate_weighted_directory_output(intermediate_directories)
       decorated_prefix_dir = decorate_prefix_directory(prefix_string, decoration)
       decorated_final_dir = decorate_final_directory(final_directory, decoration)
-      directory_output = [decorated_prefix_dir, *weighted_directories, decorated_final_dir].compact().join(decoration[:dir_separator])
+      final_output_segments = [decorated_prefix_dir, *weighted_directories, decorated_final_dir]
+      directory_output = final_output_segments.join(decoration[:dir_separator]).strip
       STDOUT.print directory_output
       STDOUT.flush
     end
