@@ -7,7 +7,7 @@ class Runner
     max_output_length = 30
     color_output = :full #:full, :partial, :off
      weight_function = lambda do |start_x, end_x|
-      weight_functions.definite_integral.call(start_x,end_x,weight_functions.parabolic_func_integral)
+      weight_functions.definite_integral.call(start_x,end_x,weight_functions.sqrt_func_integral)
     end
 
     decoration = {
